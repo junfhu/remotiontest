@@ -257,55 +257,6 @@ const MatrixRainDark: React.FC<{ frame: number }> = ({ frame }) => {
 };
 
 /* ═══════════════════════════════════════════════════════════
-   AUDIO VISUALIZER: Animated bars reacting to "audio"
-   ═══════════════════════════════════════════════════════════ */
-
-const AudioVisualizer: React.FC<{ frame: number; top: number }> = ({ frame, top }) => {
-  const barCount = 24;
-  const barWidth = 12;
-  const gap = 8;
-  const totalWidth = barCount * (barWidth + gap) - gap;
-  const startX = Cx - totalWidth / 2;
-
-  return (
-    <div
-      style={{
-        position: "absolute",
-        top,
-        left: startX,
-        display: "flex",
-        gap,
-        alignItems: "flex-end",
-        height: 60,
-        zIndex: 20,
-      }}
-    >
-      {Array.from({ length: barCount }).map((_, i) => {
-        const beat = Math.sin(frame * 0.15 + i * 0.8) * 0.5 + 0.5;
-        const beat2 = Math.sin(frame * 0.08 + i * 1.2 + 2) * 0.3 + 0.3;
-        const h = 8 + (beat + beat2) * 44;
-        const op = 0.3 + beat * 0.5;
-
-        return (
-          <div
-            key={i}
-            style={{
-              width: barWidth,
-              height: h,
-              background: `linear-gradient(to top, ${GREEN_60}, ${GREEN})`,
-              borderRadius: 3,
-              opacity: op,
-              boxShadow: `0 0 10px ${GREEN_20}`,
-              transition: "none",
-            }}
-          />
-        );
-      })}
-    </div>
-  );
-};
-
-/* ═══════════════════════════════════════════════════════════
    HOLOGRAPHIC CODE BLOCK: Chromatic aberration + scan lines
    ═══════════════════════════════════════════════════════════ */
 
@@ -1955,21 +1906,15 @@ export const AgentTutorialVideo: React.FC = () => {
       <FancyCorners frame={frame} />
       <SideAccentBars frame={frame} />
 
-      {/* ===== LAYER 3: Audio Visualizer ===== */}
-      {!isIntro && !isOutro && activeStepIndex >= 0 && (
-        <AudioVisualizer frame={frame} top={340} />
-      )}
-
-      {/* ===== LAYER 4: Intro (with Audio Visualizer) ===== */}
+      {/* ===== LAYER 3: Intro ===== */}
       {isIntro && (
         <>
-          <AudioVisualizer frame={frame} top={820} />
           <IntroSequence frame={frame} fps={fps} />
           <Audio src={staticFile("agent_voice_intro.wav")} />
         </>
       )}
 
-      {/* ===== LAYER 5: Step Progress Ring ===== */}
+      {/* ===== LAYER 4: Step Progress Ring ===== */}
       {!isIntro && !isOutro && (
         <ProgressRing
           frame={frame}
@@ -1978,7 +1923,7 @@ export const AgentTutorialVideo: React.FC = () => {
         />
       )}
 
-      {/* ===== LAYER 6: Steps ===== */}
+      {/* ===== LAYER 5: Steps ===== */}
       {stepFrames.map(({ from, to, config, index }) => (
         <Sequence key={index} from={from} durationInFrames={to - from}>
           {/* Glitch title with chromatic aberration */}
@@ -2011,16 +1956,15 @@ export const AgentTutorialVideo: React.FC = () => {
         </Sequence>
       ))}
 
-      {/* ===== LAYER 7: Outro ===== */}
+      {/* ===== LAYER 6: Outro ===== */}
       {isOutro && (
         <Sequence from={outroFrom} durationInFrames={346}>
-          <AudioVisualizer frame={frame - outroFrom} top={560} />
           <OutroSequence frame={frame - outroFrom} fps={fps} />
           <Audio src={staticFile("agent_voice_outro.wav")} />
         </Sequence>
       )}
 
-      {/* ===== LAYER 8: Global CRT Overlay (topmost) ===== */}
+      {/* ===== LAYER 7: Global CRT Overlay (topmost) ===== */}
       <GlobalCRT frame={frame} />
     </div>
   );
