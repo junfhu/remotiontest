@@ -23,6 +23,7 @@ const CODE_BG = "rgba(0, 0, 0, 0.82)";
 const W = 1080;
 const H = 1920;
 const Cx = W / 2;
+const Cy = H / 2;
 
 const clamp = (v: number, min: number, max: number) =>
   Math.max(min, Math.min(max, v));
@@ -30,6 +31,834 @@ const clamp = (v: number, min: number, max: number) =>
 const seededRandom = (seed: number) => {
   const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
   return x - Math.floor(x);
+};
+
+const seededRandomRange = (seed: number, min: number, max: number) =>
+  min + seededRandom(seed) * (max - min);
+
+/* ═══════════════════════════════════════════════════════════
+   GLITCH TITLE: Chromatic aberration + slice shifts + flash
+   ═══════════════════════════════════════════════════════════ */
+
+const GlitchTitle: React.FC<{
+  frame: number;
+  fps: number;
+  lines: string[];
+  top: number;
+  fontSize: number;
+  delay?: number;
+}> = ({ frame, fps, lines, top, fontSize, delay = 0 }) => {
+  const s = spring({ frame: frame - delay, fps, config: { damping: 10, stiffness: 120, mass: 1.2 } });
+  const rotateX = interpolate(s, [0, 0.4, 1], [90, -10, 0]);
+  const scale = interpolate(s, [0, 0.5, 1], [0.6, 1.05, 1]);
+  const opacity = interpolate(frame - delay, [0, 8], [0, 1], { extrapolateLeft: "clamp" });
+
+  // Glitch cycle
+  const gCycle = (frame - delay) % 55;
+  const isG = gCycle > 42 && gCycle < 50;
+  const gIntensity = isG ? interpolate(gCycle, [42, 45, 48, 50], [0, 1, 0.8, 0]) : 0;
+  const rgbShift = isG ? 6 * gIntensity : 0;
+  const sliceOffset = isG ? Math.sin(frame * 1.5) * 12 * gIntensity : 0;
+  const skewAmt = isG ? interpolate(gCycle, [42, 46, 50], [0, 12, 0]) : 0;
+  const flashBright = isG ? interpolate(gCycle, [42, 44, 46, 48], [0, 0.2, 0.1, 0]) : 0;
+
+  const text = lines.join("\n");
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top,
+        left: 0,
+        width: W,
+        textAlign: "center",
+        zIndex: 20,
+        opacity,
+        perspective: "1000px",
+        transformStyle: "preserve-3d",
+      }}
+    >
+      <div
+        style={{
+          transform: `rotateX(${rotateX}deg) scale(${scale}) skewX(${skewAmt}deg)`,
+          transformOrigin: "center center",
+          transformStyle: "preserve-3d",
+          position: "relative",
+        }}
+      >
+        {/* Red channel offset */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            transform: `translateX(${rgbShift}px)`,
+            mixBlendMode: "screen",
+            opacity: gIntensity * 0.5,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "'Knewave', 'Arial Black', Impact, sans-serif",
+              fontSize,
+              color: "#ff0040",
+              letterSpacing: 4,
+              lineHeight: 1.3,
+              whiteSpace: "pre-line",
+            }}
+          >
+            {text}
+          </span>
+        </div>
+        {/* Cyan channel offset */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            transform: `translateX(${-rgbShift}px)`,
+            mixBlendMode: "screen",
+            opacity: gIntensity * 0.5,
+          }}
+        >
+          <span
+            style={{
+              fontFamily: "'Knewave', 'Arial Black', Impact, sans-serif",
+              fontSize,
+              color: "#00ffff",
+              letterSpacing: 4,
+              lineHeight: 1.3,
+              whiteSpace: "pre-line",
+            }}
+          >
+            {text}
+          </span>
+        </div>
+
+        {/* Main title */}
+        <div>
+          {lines.map((line, i) => (
+            <div
+              key={i}
+              style={{
+                fontFamily: "'Knewave', 'Arial Black', Impact, sans-serif",
+                fontSize,
+                color: i === 0 ? GREEN : WHITE,
+                letterSpacing: 4,
+                textShadow: i === 0
+                  ? `0 0 40px ${GREEN_40}, 0 0 80px ${GREEN_20}, 0 0 120px ${GREEN_10}`
+                  : `0 0 30px rgba(255,255,255,0.4), 0 0 60px rgba(255,255,255,0.2)`,
+                lineHeight: 1.3,
+                marginTop: i > 0 ? 12 : 0,
+              }}
+            >
+              {line}
+            </div>
+          ))}
+        </div>
+
+        {/* Horizontal slice glitch */}
+        {isG && (
+          <div
+            style={{
+              position: "absolute",
+              top: `${35 + (frame % 4) * 15}%`,
+              left: 0,
+              width: "100%",
+              height: 3 + gIntensity * 16,
+              background: GREEN,
+              opacity: 0.4 * gIntensity,
+              transform: `translateX(${sliceOffset}px)`,
+              mixBlendMode: "overlay",
+            }}
+          />
+        )}
+
+        {/* Flash overlay */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: WHITE,
+            opacity: flashBright,
+            mixBlendMode: "overlay",
+            pointerEvents: "none",
+          }}
+        />
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   VISIBLE MATRIX RAIN: Green falling characters (dark bg)
+   ═══════════════════════════════════════════════════════════ */
+
+const matrixPool = "01アイウエオカキクケコサシスセソタチツテトナニヌネノABCDEF<>{}[]=+-*;:\\/|~";
+
+const MatrixRainDark: React.FC<{ frame: number }> = ({ frame }) => {
+  const columns = useMemo(() => {
+    return Array.from({ length: 18 }).map((_, i) => ({
+      x: 40 + i * 58,
+      speed: 1.8 + seededRandom(i * 7) * 2.5,
+      size: 14 + Math.floor(seededRandom(i * 13) * 6),
+      seed: i * 31,
+    }));
+  }, []);
+
+  return (
+    <>
+      {columns.map((col, idx) => {
+        const rows = 50;
+        const colH = rows * col.size;
+        const off = (frame * col.speed * 0.7) % colH;
+        const baseOp = 0.12 + (idx % 3) * 0.06;
+
+        return (
+          <div
+            key={idx}
+            style={{
+              position: "absolute",
+              left: col.x,
+              top: -off,
+              width: col.size + 4,
+              height: H + colH,
+              overflow: "hidden",
+              opacity: baseOp,
+              zIndex: 3,
+              pointerEvents: "none",
+            }}
+          >
+            {Array.from({ length: rows + 10 }).map((_, i) => {
+              const charIdx = Math.floor(seededRandom(frame + i + col.seed + idx * 50) * 100) % matrixPool.length;
+              const isHead = i === Math.floor((rows * 0.25 + frame * 0.04) % rows);
+              return (
+                <div
+                  key={i}
+                  style={{
+                    fontFamily: "'Courier New', monospace",
+                    fontSize: col.size,
+                    color: isHead ? GREEN : GREEN_60,
+                    lineHeight: `${col.size}px`,
+                    opacity: isHead
+                      ? 1
+                      : interpolate(i, [0, rows * 0.2, rows * 0.5, rows], [0.15, 0.8, 0.35, 0.04]),
+                    textShadow: isHead ? `0 0 12px ${GREEN_60}` : "none",
+                    transition: "none",
+                  }}
+                >
+                  {matrixPool[charIdx]}
+                </div>
+              );
+            })}
+          </div>
+        );
+      })}
+    </>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   AUDIO VISUALIZER: Animated bars reacting to "audio"
+   ═══════════════════════════════════════════════════════════ */
+
+const AudioVisualizer: React.FC<{ frame: number; top: number }> = ({ frame, top }) => {
+  const barCount = 24;
+  const barWidth = 12;
+  const gap = 8;
+  const totalWidth = barCount * (barWidth + gap) - gap;
+  const startX = Cx - totalWidth / 2;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top,
+        left: startX,
+        display: "flex",
+        gap,
+        alignItems: "flex-end",
+        height: 60,
+        zIndex: 20,
+      }}
+    >
+      {Array.from({ length: barCount }).map((_, i) => {
+        const beat = Math.sin(frame * 0.15 + i * 0.8) * 0.5 + 0.5;
+        const beat2 = Math.sin(frame * 0.08 + i * 1.2 + 2) * 0.3 + 0.3;
+        const h = 8 + (beat + beat2) * 44;
+        const op = 0.3 + beat * 0.5;
+
+        return (
+          <div
+            key={i}
+            style={{
+              width: barWidth,
+              height: h,
+              background: `linear-gradient(to top, ${GREEN_60}, ${GREEN})`,
+              borderRadius: 3,
+              opacity: op,
+              boxShadow: `0 0 10px ${GREEN_20}`,
+              transition: "none",
+            }}
+          />
+        );
+      })}
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   HOLOGRAPHIC CODE BLOCK: Chromatic aberration + scan lines
+   ═══════════════════════════════════════════════════════════ */
+
+const HolographicCodeBlock: React.FC<{
+  frame: number;
+  fps: number;
+  code: string;
+  top: number;
+  delay?: number;
+}> = ({ frame, fps, code, top, delay = 0 }) => {
+  const enter = spring({
+    frame: frame - delay,
+    fps,
+    config: { damping: 14, stiffness: 90 },
+  });
+  const yOff = interpolate(enter, [0, 1], [50, 0]);
+  const op = interpolate(frame - delay, [0, 10], [0, 1], { extrapolateLeft: "clamp" });
+
+  // Scan shine
+  const shineX = interpolate((frame - delay) % 90, [0, 45, 90], [-200, W + 200, W + 200]);
+  const shineOp = interpolate((frame - delay) % 90, [0, 22, 45, 67, 90], [0, 0.4, 0, 0, 0], {
+    extrapolateRight: "clamp",
+  });
+
+  // Holographic glitch
+  const hGlitch = (frame - delay) % 60 > 52 ? 1 : 0;
+  const hShift = hGlitch ? Math.sin(frame * 2) * 3 : 0;
+  const hOp = hGlitch ? 0.3 : 0;
+
+  // Floating scan line
+  const scanY = ((frame - delay) * 1.2) % 200;
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top,
+        left: 60,
+        right: 60,
+        zIndex: 20,
+        opacity: op,
+        transform: `translateY(${yOff}px) translateX(${hShift}px)`,
+      }}
+    >
+      {/* Red holographic channel */}
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          transform: "translateX(2px)",
+          mixBlendMode: "screen",
+          opacity: hOp,
+          zIndex: 2,
+          pointerEvents: "none",
+        }}
+      >
+        <div
+          style={{
+            background: CODE_BG,
+            border: `1px solid ${GREEN_30}`,
+            borderRadius: 16,
+            padding: "28px 32px",
+            fontFamily: "'SF Mono', 'Courier New', Consolas, monospace",
+            fontSize: 22,
+            lineHeight: 1.7,
+            color: "#ff0040",
+            whiteSpace: "pre-wrap",
+            wordBreak: "break-all",
+          }}
+        >
+          {code}
+        </div>
+      </div>
+
+      {/* Main code block */}
+      <div
+        style={{
+          background: CODE_BG,
+          border: `1px solid ${GREEN_30}`,
+          borderRadius: 16,
+          padding: "28px 32px",
+          boxShadow: `0 0 50px ${GREEN_10}, inset 0 0 30px rgba(118,185,0,0.03)`,
+          fontFamily: "'SF Mono', 'Courier New', Consolas, monospace",
+          fontSize: 22,
+          lineHeight: 1.7,
+          color: WHITE,
+          whiteSpace: "pre-wrap",
+          wordBreak: "break-all",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        {/* Scan shine */}
+        <div
+          style={{
+            position: "absolute",
+            top: 0,
+            left: shineX,
+            width: 120,
+            height: "100%",
+            background: `linear-gradient(90deg, transparent, ${GREEN}50, transparent)`,
+            opacity: shineOp,
+            pointerEvents: "none",
+          }}
+        />
+        {/* CRT scan lines */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background: `repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(118,185,0,0.025) 3px, rgba(118,185,0,0.025) 6px)`,
+            pointerEvents: "none",
+            borderRadius: 16,
+          }}
+        />
+        {/* Floating holographic scan line */}
+        <div
+          style={{
+            position: "absolute",
+            top: scanY,
+            left: 0,
+            width: "100%",
+            height: 2,
+            background: `linear-gradient(90deg, transparent, ${GREEN_60}, transparent)`,
+            opacity: 0.4,
+            pointerEvents: "none",
+          }}
+        />
+        {/* Typewriter text */}
+        <div style={{ position: "relative", zIndex: 2 }}>
+          {code.split("").map((ch, i) => {
+            const chFrame = frame - delay - i * 0.4;
+            const chOp = interpolate(chFrame, [0, 3], [0, 1], { extrapolateLeft: "clamp" });
+            const isKeyword = /[{}()<>="'/\[\]]/.test(ch) ||
+              ["npm", "install", "import", "from", "const", "export", "return", "function", "prompt", "Agent", "Claude"].some(
+                (kw) => code.substring(i, i + kw.length) === kw
+              );
+            const isString = code.substring(0, i).split('"').length % 2 === 0 && ch !== '"';
+
+            let chColor = WHITE;
+            if (isKeyword && !isString) chColor = GREEN;
+            if (isString) chColor = "#ffaa44";
+
+            return (
+              <span
+                key={i}
+                style={{
+                  color: chColor,
+                  opacity: chOp,
+                  textShadow: chOp > 0.8 && isKeyword ? `0 0 8px ${GREEN_40}` : "none",
+                }}
+              >
+                {ch === " " ? "\u00A0" : ch}
+              </span>
+            );
+          })}
+          {frame > delay + code.length * 0.4 && (
+            <span
+              style={{
+                display: "inline-block",
+                width: 10,
+                height: 24,
+                background: GREEN,
+                marginLeft: 4,
+                verticalAlign: "middle",
+                opacity: frame % 30 < 15 ? 1 : 0.3,
+              }}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   KINETIC SUBTITLE: Blur + scale + slide dramatic entrance
+   ═══════════════════════════════════════════════════════════ */
+
+const KineticSubtitle: React.FC<{
+  frame: number;
+  text: string;
+  startFrame: number;
+  endFrame: number;
+}> = ({ frame, text, startFrame, endFrame }) => {
+  const progress = interpolate(
+    frame,
+    [startFrame, startFrame + 15, endFrame - 15, endFrame],
+    [0, 1, 1, 0],
+    { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
+  );
+
+  const enterProgress = interpolate(frame, [startFrame, startFrame + 15], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const blur = interpolate(enterProgress, [0, 1], [20, 0]);
+  const scale = interpolate(enterProgress, [0, 1], [0.85, 1]);
+  const yOff = interpolate(enterProgress, [0, 1], [30, 0]);
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        bottom: 110,
+        left: 50,
+        right: 50,
+        zIndex: 50,
+        opacity: progress,
+        textAlign: "center",
+      }}
+    >
+      <div
+        style={{
+          background: "rgba(0,0,0,0.55)",
+          backdropFilter: `blur(12px)`,
+          WebkitBackdropFilter: "blur(12px)",
+          padding: "18px 28px",
+          borderRadius: 16,
+          border: `1px solid ${GREEN_20}`,
+          display: "inline-block",
+          maxWidth: "100%",
+          boxShadow: `0 0 30px ${GREEN_10}`,
+          transform: `scale(${scale}) translateY(${yOff}px)`,
+        }}
+      >
+        <span
+          style={{
+            fontFamily: "'PingFang SC', 'Microsoft YaHei', sans-serif",
+            fontSize: 30,
+            fontWeight: 600,
+            color: WHITE,
+            lineHeight: 1.5,
+            textShadow: `0 0 15px ${GREEN_30}`,
+            filter: `blur(${blur}px)`,
+            transition: "none",
+          }}
+        >
+          {text}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   TRANSITION WIPE: Diamond mask wipe between steps
+   ═══════════════════════════════════════════════════════════ */
+
+const TransitionDiamond: React.FC<{
+  frame: number;
+  duration?: number;
+}> = ({ frame, duration = 20 }) => {
+  const size = interpolate(frame, [0, duration], [0, W * 1.8], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const op = interpolate(frame, [0, 5, duration - 5, duration], [0, 0.8, 0.8, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        zIndex: 100,
+        opacity: op,
+        pointerEvents: "none",
+        background: GREEN,
+        clipPath: `polygon(
+          ${Cx - size / 2}px ${Cy - size / 2}px,
+          ${Cx}px ${Cy - size}px,
+          ${Cx + size / 2}px ${Cy - size / 2}px,
+          ${Cx + size}px ${Cy},
+          ${Cx + size / 2}px ${Cy + size / 2}px,
+          ${Cx}px ${Cy + size}px,
+          ${Cx - size / 2}px ${Cy + size / 2}px,
+          ${Cx - size}px ${Cy}
+        )`,
+      }}
+    />
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   PROGRESS RING: Animated circular progress around step
+   ═══════════════════════════════════════════════════════════ */
+
+const ProgressRing: React.FC<{
+  frame: number;
+  totalSteps: number;
+  currentStep: number;
+}> = ({ frame, totalSteps, currentStep }) => {
+  const gap = 22;
+  const radius = 10;
+  const circumference = 2 * Math.PI * radius;
+  const startX = Cx - ((totalSteps - 1) * gap) / 2;
+
+  return (
+    <div style={{ position: "absolute", top: 120, left: 0, width: W, textAlign: "center", zIndex: 30 }}>
+      <div style={{ display: "inline-flex", gap: 14, alignItems: "center" }}>
+        {Array.from({ length: totalSteps }).map((_, i) => {
+          const isActive = i === currentStep;
+          const isPast = i < currentStep;
+          const progress = isPast ? 1 : isActive ? interpolate(frame, [0, 60], [0, 1], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }) : 0;
+          const activeSpring = spring({
+            frame: isActive ? frame : 0,
+            fps: 30,
+            config: { damping: 12, stiffness: 200 },
+          });
+          const activeScale = isActive ? interpolate(activeSpring, [0, 1], [1.5, 1.2]) : 1;
+          const activePulse = isActive ? 0.5 + Math.sin(frame * 0.12) * 0.5 : 0;
+
+          return (
+            <div key={i} style={{ position: "relative", display: "flex", alignItems: "center" }}>
+              {/* Progress ring SVG */}
+              <svg
+                width={28}
+                height={28}
+                style={{ position: "absolute", top: -4, left: -4, opacity: isActive || isPast ? 1 : 0 }}
+              >
+                <circle
+                  cx={14}
+                  cy={14}
+                  r={radius}
+                  fill="none"
+                  stroke={GREEN_30}
+                  strokeWidth={2}
+                />
+                <circle
+                  cx={14}
+                  cy={14}
+                  r={radius}
+                  fill="none"
+                  stroke={GREEN}
+                  strokeWidth={2}
+                  strokeDasharray={`${circumference * progress} ${circumference}`}
+                  strokeLinecap="round"
+                  transform="rotate(-90 14 14)"
+                  style={{ transition: "none" }}
+                />
+              </svg>
+
+              <div
+                style={{
+                  width: isActive ? 16 : 10,
+                  height: isActive ? 16 : 10,
+                  borderRadius: "50%",
+                  background: isPast || isActive ? GREEN : "rgba(255,255,255,0.15)",
+                  transform: `scale(${activeScale})`,
+                  boxShadow: isActive ? `0 0 20px ${GREEN_60}, 0 0 40px ${GREEN_30}` : "none",
+                  transition: "none",
+                }}
+              />
+              {isActive && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: -10,
+                    left: -10,
+                    width: 36,
+                    height: 36,
+                    borderRadius: "50%",
+                    border: `2px solid ${GREEN}`,
+                    opacity: activePulse,
+                    transform: `scale(${1 + activePulse * 0.3})`,
+                    transition: "none",
+                  }}
+                />
+              )}
+              {i < totalSteps - 1 && (
+                <div
+                  style={{
+                    width: gap - 4,
+                    height: 2,
+                    background: isPast ? GREEN : "rgba(255,255,255,0.12)",
+                    marginLeft: 8,
+                  }}
+                />
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   GLOBAL CRT OVERLAY: Full screen scan lines + flicker
+   ═══════════════════════════════════════════════════════════ */
+
+const GlobalCRT: React.FC<{ frame: number }> = ({ frame }) => (
+  <>
+    {/* Scan lines */}
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        background: `repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)`,
+        pointerEvents: "none",
+        zIndex: 200,
+        opacity: 0.6,
+      }}
+    />
+    {/* Subtle vignette flicker */}
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        background: "radial-gradient(ellipse at 50% 50%, transparent 50%, rgba(0,0,0,0.08) 100%)",
+        pointerEvents: "none",
+        zIndex: 200,
+        opacity: 0.5 + Math.sin(frame * 0.2) * 0.1,
+      }}
+    />
+    {/* Occasional flash line */}
+    {frame % 120 < 3 && (
+      <div
+        style={{
+          position: "absolute",
+          top: interpolate(frame % 120, [0, 3], [0, H]),
+          left: 0,
+          width: W,
+          height: 2,
+          background: `linear-gradient(90deg, transparent, ${GREEN_40}, transparent)`,
+          pointerEvents: "none",
+          zIndex: 200,
+          opacity: interpolate(frame % 120, [0, 1, 2, 3], [0, 0.3, 0.2, 0]),
+        }}
+      />
+    )}
+  </>
+);
+
+/* ═══════════════════════════════════════════════════════════
+   FLOATING HEXAGONS: Rotating tech decorations
+   ═══════════════════════════════════════════════════════════ */
+
+const FloatingHexagons: React.FC<{ frame: number }> = ({ frame }) => {
+  const hexagons = useMemo(
+    () => [
+      { x: 120, y: 250, r: 40, spd: 0.4, phase: 0 },
+      { x: 960, y: 600, r: 60, spd: -0.3, phase: 1.5 },
+      { x: 180, y: 1100, r: 35, spd: 0.5, phase: 3 },
+      { x: 900, y: 1500, r: 50, spd: -0.35, phase: 0.8 },
+      { x: 540, y: 200, r: 25, spd: 0.6, phase: 2.2 },
+      { x: 300, y: 1700, r: 45, spd: -0.45, phase: 4.1 },
+    ],
+    []
+  );
+
+  return (
+    <svg
+      width={W}
+      height={H}
+      style={{ position: "absolute", top: 0, left: 0, zIndex: 4, pointerEvents: "none" }}
+    >
+      {hexagons.map((h, i) => {
+        const rot = (frame * h.spd * 2) % 360;
+        const floatY = Math.sin(frame * 0.008 + h.phase) * 15;
+        const floatX = Math.cos(frame * 0.006 + h.phase) * 10;
+        const op = 0.08 + Math.sin(frame * 0.04 + h.phase) * 0.04;
+        const pulse = 1 + Math.sin(frame * 0.03 + h.phase) * 0.15;
+
+        const pts = [];
+        for (let k = 0; k < 6; k++) {
+          const a = (Math.PI / 3) * k - Math.PI / 6;
+          pts.push(`${h.x + floatX + (h.r * pulse) * Math.cos(a)},${h.y + floatY + (h.r * pulse) * Math.sin(a)}`);
+        }
+        const path = `M${pts.join(" L")} Z`;
+
+        return (
+          <g key={i} transform={`rotate(${rot} ${h.x + floatX} ${h.y + floatY})`}>
+            <path d={path} fill="none" stroke={GREEN} strokeWidth="1.2" opacity={op} />
+            <path d={path} fill={GREEN} opacity={op * 0.3} />
+          </g>
+        );
+      })}
+    </svg>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   LASER SWEEP: Dramatic green beam sweeping across screen
+   ═══════════════════════════════════════════════════════════ */
+
+const LaserSweep: React.FC<{ frame: number; activeFrames?: number }> = ({ frame, activeFrames = 80 }) => {
+  const y = interpolate(frame % activeFrames, [0, activeFrames], [-100, H + 100]);
+  const op = interpolate(frame % activeFrames, [0, 10, activeFrames - 10, activeFrames], [0, 0.25, 0.25, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: y - 60,
+        left: 0,
+        width: W,
+        height: 120,
+        background: `linear-gradient(to bottom, transparent, ${GREEN_20}, ${GREEN_40}, ${GREEN_20}, transparent)`,
+        opacity: op,
+        pointerEvents: "none",
+        zIndex: 15,
+        filter: "blur(8px)",
+      }}
+    />
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════
+   SHOCKWAVE RING: Expanding ring on transitions
+   ═══════════════════════════════════════════════════════════ */
+
+const ShockwaveRing: React.FC<{
+  frame: number;
+  cx?: number;
+  cy?: number;
+}> = ({ frame, cx = Cx, cy = H / 2 }) => {
+  const r = interpolate(frame, [0, 40], [0, W * 0.8], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
+  const op = interpolate(frame, [0, 5, 25, 40], [0, 0.6, 0.3, 0], { extrapolateLeft: "clamp" });
+  const strokeW = interpolate(frame, [0, 40], [4, 0.5], { extrapolateLeft: "clamp" });
+
+  return (
+    <svg
+      width={W}
+      height={H}
+      style={{ position: "absolute", top: 0, left: 0, zIndex: 99, pointerEvents: "none" }}
+    >
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r}
+        fill="none"
+        stroke={GREEN}
+        strokeWidth={strokeW}
+        opacity={op}
+      />
+      <circle
+        cx={cx}
+        cy={cy}
+        r={r * 0.7}
+        fill="none"
+        stroke={GREEN_40}
+        strokeWidth={strokeW * 0.7}
+        opacity={op * 0.6}
+      />
+    </svg>
+  );
 };
 
 /* ═══════════════════════════════════════════════════════════
@@ -940,7 +1769,7 @@ npx remotion render \
 const IntroSequence: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
   return (
     <>
-      <FlipTitle
+      <GlitchTitle
         frame={frame}
         fps={fps}
         lines={["AI AGENT", "自动生成视频"]}
@@ -1079,12 +1908,28 @@ export const AgentTutorialVideo: React.FC = () => {
         overflow: "hidden",
       }}
     >
-      {/* Layer 0: Animated background */}
+      {/* ===== LAYER 0: Background FX ===== */}
       <AnimatedBG frame={frame} />
       <FloatingOrbs frame={frame} />
+      <MatrixRainDark frame={frame} />
+      <FloatingHexagons frame={frame} />
       <Vignette />
+      <LaserSweep frame={frame} activeFrames={100} />
 
-      {/* Layer 1: Connecting lines (only during steps) */}
+      {/* ===== LAYER 1: Transition Effects ===== */}
+      {/* Shockwave ring on step start */}
+      {stepFrames.some(({ from }) => frame >= from && frame < from + 40) && (
+        <ShockwaveRing
+          frame={(() => {
+            const sf = stepFrames.find(({ from }) => frame >= from && frame < from + 40);
+            return sf ? frame - sf.from : 0;
+          })()}
+          cx={Cx}
+          cy={600}
+        />
+      )}
+
+      {/* Connecting lines during steps */}
       {!isIntro && !isOutro && activeStepIndex >= 0 && (
         <ConnectingLines
           frame={frame - stepFrames[activeStepIndex].from}
@@ -1096,7 +1941,7 @@ export const AgentTutorialVideo: React.FC = () => {
         />
       )}
 
-      {/* Layer 2: Particle burst on transitions */}
+      {/* Particle burst on step transitions */}
       {showBurst && (
         <ParticleBurst
           frame={frame % 45}
@@ -1106,31 +1951,38 @@ export const AgentTutorialVideo: React.FC = () => {
         />
       )}
 
-      {/* Layer 3: Decorative corners and accents */}
+      {/* ===== LAYER 2: Decorative Overlays ===== */}
       <FancyCorners frame={frame} />
       <SideAccentBars frame={frame} />
 
-      {/* Layer 4: Intro */}
+      {/* ===== LAYER 3: Audio Visualizer ===== */}
+      {!isIntro && !isOutro && activeStepIndex >= 0 && (
+        <AudioVisualizer frame={frame} top={340} />
+      )}
+
+      {/* ===== LAYER 4: Intro (with Audio Visualizer) ===== */}
       {isIntro && (
         <>
+          <AudioVisualizer frame={frame} top={820} />
           <IntroSequence frame={frame} fps={fps} />
           <Audio src={staticFile("agent_voice_intro.wav")} />
         </>
       )}
 
-      {/* Layer 5: Step indicator */}
+      {/* ===== LAYER 5: Step Progress Ring ===== */}
       {!isIntro && !isOutro && (
-        <StepIndicator
+        <ProgressRing
           frame={frame}
           totalSteps={STEPS.length}
           currentStep={activeStepIndex}
         />
       )}
 
-      {/* Layer 6: Steps */}
+      {/* ===== LAYER 6: Steps ===== */}
       {stepFrames.map(({ from, to, config, index }) => (
         <Sequence key={index} from={from} durationInFrames={to - from}>
-          <FlipTitle
+          {/* Glitch title with chromatic aberration */}
+          <GlitchTitle
             frame={frame - from}
             fps={fps}
             lines={[`STEP 0${index + 1}`, config.name]}
@@ -1138,7 +1990,8 @@ export const AgentTutorialVideo: React.FC = () => {
             fontSize={52}
           />
           <Audio src={staticFile(config.voice)} />
-          <Subtitle
+          {/* Kinetic subtitle with blur+scale entrance */}
+          <KineticSubtitle
             frame={frame}
             text={config.subtitle}
             startFrame={from + 15}
@@ -1147,7 +2000,7 @@ export const AgentTutorialVideo: React.FC = () => {
           {config.isPrompt ? (
             <PromptShowcase frame={frame - from} fps={fps} delay={30} />
           ) : (
-            <FancyCodeBlock
+            <HolographicCodeBlock
               frame={frame - from}
               fps={fps}
               code={config.code}
@@ -1158,13 +2011,17 @@ export const AgentTutorialVideo: React.FC = () => {
         </Sequence>
       ))}
 
-      {/* Layer 7: Outro */}
+      {/* ===== LAYER 7: Outro ===== */}
       {isOutro && (
         <Sequence from={outroFrom} durationInFrames={346}>
+          <AudioVisualizer frame={frame - outroFrom} top={560} />
           <OutroSequence frame={frame - outroFrom} fps={fps} />
           <Audio src={staticFile("agent_voice_outro.wav")} />
         </Sequence>
       )}
+
+      {/* ===== LAYER 8: Global CRT Overlay (topmost) ===== */}
+      <GlobalCRT frame={frame} />
     </div>
   );
 };
