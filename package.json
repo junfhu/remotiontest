@@ -4,8 +4,11 @@
   "description": "Cinematic CEO Introduction - Remotion",
   "scripts": {
     "start": "remotion studio",
-    "build": "remotion render src/index.ts CEOIntroduction out/video.mp4",
-    "studio": "remotion studio"
+    "studio": "remotion studio",
+    "build": "remotion render src/index.ts CEOIntroduction out/ceo_introduction.mp4",
+    "build:tutorial": "remotion render src/index.ts TutorialVideo out/tutorial.mp4",
+    "build:agent": "remotion render src/index.ts AgentTutorialVideo out/agent_tutorial.mp4",
+    "build:all": "npm run build && npm run build:tutorial && npm run build:agent"
   },
   "dependencies": {
     "@remotion/cli": "^4.0.451",
