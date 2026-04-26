@@ -2,6 +2,7 @@ import React from "react";
 import { Composition } from "remotion";
 import { CEOIntroduction } from "./CEOIntroduction";
 import { TutorialVideo } from "./TutorialVideo";
+import { AgentTutorialVideo } from "./AgentTutorialVideo";
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -18,6 +19,14 @@ export const RemotionRoot: React.FC = () => {
         id="TutorialVideo"
         component={TutorialVideo}
         durationInFrames={1920}
+        fps={30}
+        width={1080}
+        height={1920}
+      />
+      <Composition
+        id="AgentTutorialVideo"
+        component={AgentTutorialVideo}
+        durationInFrames={2880}
         fps={30}
         width={1080}
         height={1920}
