@@ -18,8 +18,8 @@ const GREEN_80 = "rgba(118, 185, 0, 0.80)";
 const DARK = "rgba(8, 14, 4, 0.88)";
 const WHITE = "#ffffff";
 
-const W = 1920;
-const H = 1080;
+const W = 1080;
+const H = 1920;
 const Cx = W / 2;
 const Cy = H / 2;
 
@@ -39,13 +39,13 @@ const seededRandom = (seed: number) => {
 /* ── Background layer: perspective grid + vignette ────────── */
 
 const PerspectiveGrid: React.FC<{ frame: number }> = ({ frame }) => {
-  const horizonY = 420;
+  const horizonY = 640;
   const speed = 0.6;
   const offset = (frame * speed) % 40;
   const opacity = interpolate(frame, [0, 25], [0, 0.12], { extrapolateLeft: "clamp", extrapolateRight: "clamp" });
 
   const linesH = [];
-  for (let i = -10; i < 30; i++) {
+  for (let i = -10; i < 40; i++) {
     const y = horizonY + offset + i * 40;
     const t = clamp((y - horizonY) / (H - horizonY), 0, 1);
     const alpha = t * 0.6;
@@ -64,9 +64,9 @@ const PerspectiveGrid: React.FC<{ frame: number }> = ({ frame }) => {
   }
 
   const linesV = [];
-  const centerX = 1100; // shifted right because Jensen is on right
+  const centerX = Cx; // centered for portrait
   for (let i = -20; i < 25; i++) {
-    const baseX = centerX + i * 60;
+    const baseX = centerX + i * 50;
     const t = clamp(Math.abs(i) / 20, 0, 1);
     linesV.push(
       <line
@@ -153,7 +153,7 @@ const TitleBlock: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
     <div
       style={{
         position: "absolute",
-        top: 280,
+        top: 340,
         left: 0,
         width: W,
         display: "flex",
@@ -167,8 +167,8 @@ const TitleBlock: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
       <div
         style={{
           position: "absolute",
-          width: 900,
-          height: 300,
+          width: 800,
+          height: 280,
           background: `radial-gradient(ellipse, ${GREEN_30} 0%, transparent 70%)`,
           filter: "blur(60px)",
           opacity: glowOpacity,
@@ -190,10 +190,10 @@ const TitleBlock: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
             left: 3,
             top: 0,
             fontFamily: "'Knewave', 'Arial Black', Impact, sans-serif",
-            fontSize: 150,
+            fontSize: 90,
             fontWeight: 900,
             color: "#ff0040",
-            letterSpacing: 14,
+            letterSpacing: 10,
             textTransform: "uppercase",
             opacity: interpolate(frame, [0, 8, 12], [0.5, 0.15, 0]),
             mixBlendMode: "screen",
@@ -208,10 +208,10 @@ const TitleBlock: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
             left: -3,
             top: 0,
             fontFamily: "'Knewave', 'Arial Black', Impact, sans-serif",
-            fontSize: 150,
+            fontSize: 90,
             fontWeight: 900,
             color: "#00ffff",
-            letterSpacing: 14,
+            letterSpacing: 10,
             textTransform: "uppercase",
             opacity: interpolate(frame, [0, 8, 12], [0.5, 0.15, 0]),
             mixBlendMode: "screen",
@@ -222,7 +222,7 @@ const TitleBlock: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
         </span>
 
         {/* main text with per-letter subtle stagger */}
-        <div style={{ display: "flex", gap: 6 }}>
+        <div style={{ display: "flex", gap: 4 }}>
           {chars.split("").map((ch, i) => {
             const d = spring({
               frame: frame - i * letterDelay,
@@ -236,12 +236,12 @@ const TitleBlock: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
                 key={i}
                 style={{
                   fontFamily: "'Knewave', 'Arial Black', Impact, sans-serif",
-                  fontSize: 150,
+                  fontSize: 90,
                   fontWeight: 900,
                   color: ch === " " ? "transparent" : GREEN,
-                  letterSpacing: ch === " " ? 20 : 4,
+                  letterSpacing: ch === " " ? 16 : 3,
                   textTransform: "uppercase",
-                  textShadow: `0 0 50px ${GREEN_20}, 0 0 100px ${GREEN_10}, 0 4px 0 rgba(0,0,0,0.04)`,
+                  textShadow: `0 0 40px ${GREEN_20}, 0 0 80px ${GREEN_10}, 0 3px 0 rgba(0,0,0,0.04)`,
                   transform: `translateY(${yOff}px)`,
                   opacity: ch === " " ? 1 : chOp,
                   display: "inline-block",
@@ -258,7 +258,7 @@ const TitleBlock: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) =>
           style={{
             marginTop: 12,
             height: 4,
-            width: interpolate(frame, [10, 30], [0, 700], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
+            width: interpolate(frame, [10, 30], [0, 520], { extrapolateLeft: "clamp", extrapolateRight: "clamp" }),
             background: `linear-gradient(90deg, transparent, ${GREEN}, transparent)`,
             boxShadow: `0 0 20px ${GREEN_40}`,
             marginLeft: "auto",
@@ -289,10 +289,10 @@ const BackgroundPortrait: React.FC<{ frame: number; fps: number }> = ({ frame, f
     <div
       style={{
         position: "absolute",
-        right: 80,
-        top: 140,
-        width: 460,
-        height: 780,
+        left: Cx - 320,
+        top: 840,
+        width: 640,
+        height: 1080,
         zIndex: 2,
         transform: `scale(${enterScale}) translateX(${floatX}px) translateY(${floatY}px)`,
         opacity: enterOp,
@@ -300,7 +300,7 @@ const BackgroundPortrait: React.FC<{ frame: number; fps: number }> = ({ frame, f
       }}
     >
       {/* main portrait (cartoonized) */}
-      <Img src={staticFile("muya.png")} style={{ width: 460, height: 780, objectFit: 'contain' }} />
+      <Img src={staticFile("muya.png")} style={{ width: 640, height: 1080, objectFit: 'contain' }} />
 
       {/* subtle scan lines on portrait */}
       <div
@@ -329,7 +329,7 @@ const HUDPanel: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
     fps,
     config: { damping: 16, stiffness: 90, mass: 1.2 },
   });
-  const x = interpolate(panelSpring, [0, 1], [-620, 90]);
+  const x = interpolate(panelSpring, [0, 1], [-620, 230]);
   const op = interpolate(frame - 40, [0, 8], [0, 1], { extrapolateLeft: "clamp" });
 
   /* inner content reveal */
@@ -359,8 +359,8 @@ const HUDPanel: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
       style={{
         position: "absolute",
         left: x,
-        top: 550,
-        width: 750,
+        top: 540,
+        width: 620,
         zIndex: 20,
         opacity: op,
       }}
@@ -377,8 +377,8 @@ const HUDPanel: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
       >
         {/* corner accent brackets on panel */}
         <PanelCorner x={0} y={0} rotation={0} frame={frame} delay={50} />
-        <PanelCorner x={412} y={0} rotation={90} frame={frame} delay={55} />
-        <PanelCorner x={412} y={320} rotation={180} frame={frame} delay={60} />
+        <PanelCorner x={592} y={0} rotation={90} frame={frame} delay={55} />
+        <PanelCorner x={592} y={320} rotation={180} frame={frame} delay={60} />
         <PanelCorner x={0} y={320} rotation={270} frame={frame} delay={65} />
 
         {/* scan-line CRT overlay inside panel */}
@@ -519,14 +519,14 @@ const PanelCorner: React.FC<{
 /* ── Tech Rings (behind Muya) ──────────────────────────── */
 
 const TechRings: React.FC<{ frame: number }> = ({ frame }) => {
-  const cx = 1350;
-  const cy = 540;
+  const cx = Cx;
+  const cy = 1000;
   const rings = [
-    { r: 180, d: 20, g: 12, dir: 1, sw: 2.5, spd: 1.2, delay: 40 },
-    { r: 240, d: 35, g: 8, dir: -1, sw: 1.5, spd: 0.8, delay: 48 },
-    { r: 300, d: 16, g: 22, dir: 1, sw: 1, spd: 1.6, delay: 56 },
-    { r: 360, d: 28, g: 14, dir: -1, sw: 0.8, spd: 0.5, delay: 64 },
-    { r: 420, d: 10, g: 30, dir: 1, sw: 0.5, spd: 2.0, delay: 72 },
+    { r: 160, d: 20, g: 12, dir: 1, sw: 2.5, spd: 1.2, delay: 40 },
+    { r: 220, d: 35, g: 8, dir: -1, sw: 1.5, spd: 0.8, delay: 48 },
+    { r: 280, d: 16, g: 22, dir: 1, sw: 1, spd: 1.6, delay: 56 },
+    { r: 340, d: 28, g: 14, dir: -1, sw: 0.8, spd: 0.5, delay: 64 },
+    { r: 400, d: 10, g: 30, dir: 1, sw: 0.5, spd: 2.0, delay: 72 },
   ];
 
   return (
@@ -581,9 +581,9 @@ const TechRings: React.FC<{ frame: number }> = ({ frame }) => {
 /* ── Scanner Lines ───────────────────────────────────────── */
 
 const ScannerLines: React.FC<{ frame: number }> = ({ frame }) => {
-  const x1 = interpolate(frame % 100, [0, 100], [-80, 2000]);
-  const x2 = interpolate((frame + 50) % 130, [0, 130], [-80, 2000]);
-  const y1 = interpolate(frame % 80, [0, 80], [0, 1080]);
+  const x1 = interpolate(frame % 100, [0, 100], [-80, 1160]);
+  const x2 = interpolate((frame + 50) % 130, [0, 130], [-80, 1160]);
+  const y1 = interpolate(frame % 80, [0, 80], [0, 1920]);
 
   return (
     <>
@@ -636,13 +636,13 @@ const ScannerLines: React.FC<{ frame: number }> = ({ frame }) => {
 const CornerBrackets: React.FC<{ frame: number; fps: number }> = ({ frame, fps }) => {
   const brackets: Array<{ x: number; y: number; size: number; rot: number; delay: number }> = [
     { x: 50, y: 50, size: 70, rot: 0, delay: 18 },
-    { x: 1850, y: 50, size: 70, rot: 90, delay: 22 },
-    { x: 1850, y: 960, size: 70, rot: 180, delay: 26 },
-    { x: 50, y: 960, size: 70, rot: 270, delay: 30 },
-    { x: 620, y: 260, size: 30, rot: 0, delay: 35 },
-    { x: 1270, y: 260, size: 30, rot: 90, delay: 37 },
-    { x: 1270, y: 450, size: 30, rot: 180, delay: 39 },
-    { x: 620, y: 450, size: 30, rot: 270, delay: 41 },
+    { x: 1030, y: 50, size: 70, rot: 90, delay: 22 },
+    { x: 1030, y: 1870, size: 70, rot: 180, delay: 26 },
+    { x: 50, y: 1870, size: 70, rot: 270, delay: 30 },
+    { x: 240, y: 300, size: 30, rot: 0, delay: 35 },
+    { x: 840, y: 300, size: 30, rot: 90, delay: 37 },
+    { x: 840, y: 470, size: 30, rot: 180, delay: 39 },
+    { x: 240, y: 470, size: 30, rot: 270, delay: 41 },
   ];
 
   return (
@@ -687,18 +687,18 @@ const CornerBrackets: React.FC<{ frame: number; fps: number }> = ({ frame, fps }
 const Particles: React.FC<{ frame: number }> = ({ frame }) => {
   const particles = useMemo(
     () => [
-      { x: 140, y: 180, s: 24, spd: 1.3, d: 50, t: "tri" },
-      { x: 340, y: 760, s: 18, spd: 0.9, d: 60, t: "hex" },
-      { x: 1680, y: 130, s: 20, spd: 1.6, d: 55, t: "tri" },
-      { x: 1580, y: 840, s: 26, spd: 1.1, d: 65, t: "hex" },
-      { x: 900, y: 80, s: 16, spd: 1.4, d: 70, t: "tri" },
-      { x: 520, y: 480, s: 32, spd: 0.7, d: 45, t: "hex" },
-      { x: 1420, y: 380, s: 22, spd: 1.2, d: 75, t: "tri" },
-      { x: 220, y: 620, s: 28, spd: 0.85, d: 80, t: "hex" },
-      { x: 1100, y: 200, s: 14, spd: 1.5, d: 52, t: "cross" },
-      { x: 800, y: 750, s: 20, spd: 1.0, d: 68, t: "diamond" },
-      { x: 400, y: 300, s: 12, spd: 1.8, d: 42, t: "tri" },
-      { x: 1750, y: 600, s: 18, spd: 0.95, d: 58, t: "hex" },
+      { x: 80, y: 200, s: 24, spd: 1.3, d: 50, t: "tri" },
+      { x: 980, y: 300, s: 18, spd: 0.9, d: 60, t: "hex" },
+      { x: 900, y: 160, s: 20, spd: 1.6, d: 55, t: "tri" },
+      { x: 180, y: 900, s: 26, spd: 1.1, d: 65, t: "hex" },
+      { x: 540, y: 120, s: 16, spd: 1.4, d: 70, t: "tri" },
+      { x: 320, y: 600, s: 32, spd: 0.7, d: 45, t: "hex" },
+      { x: 820, y: 700, s: 22, spd: 1.2, d: 75, t: "tri" },
+      { x: 120, y: 1200, s: 28, spd: 0.85, d: 80, t: "hex" },
+      { x: 960, y: 1400, s: 14, spd: 1.5, d: 52, t: "cross" },
+      { x: 500, y: 1500, s: 20, spd: 1.0, d: 68, t: "diamond" },
+      { x: 200, y: 1700, s: 12, spd: 1.8, d: 42, t: "tri" },
+      { x: 880, y: 1800, s: 18, spd: 0.95, d: 58, t: "hex" },
     ],
     []
   );
@@ -742,7 +742,7 @@ const Particles: React.FC<{ frame: number }> = ({ frame }) => {
 /* ── Cinematic Bars + Top/Bottom Accent ──────────────────── */
 
 const CinematicBars: React.FC<{ frame: number }> = ({ frame }) => {
-  const h = 60;
+  const w = 20;
   const barOp = interpolate(frame, [0, 20], [0, 0.85], { extrapolateLeft: "clamp" });
   return (
     <>
@@ -751,9 +751,9 @@ const CinematicBars: React.FC<{ frame: number }> = ({ frame }) => {
           position: "absolute",
           top: 0,
           left: 0,
-          width: W,
-          height: h,
-          background: `linear-gradient(to bottom, ${DARK}, transparent)`,
+          width: w,
+          height: H,
+          background: `linear-gradient(to right, ${DARK}, transparent)`,
           opacity: barOp,
           zIndex: 25,
           pointerEvents: "none",
@@ -762,11 +762,11 @@ const CinematicBars: React.FC<{ frame: number }> = ({ frame }) => {
       <div
         style={{
           position: "absolute",
-          bottom: 0,
-          left: 0,
-          width: W,
-          height: h,
-          background: `linear-gradient(to top, ${DARK}, transparent)`,
+          top: 0,
+          right: 0,
+          width: w,
+          height: H,
+          background: `linear-gradient(to left, ${DARK}, transparent)`,
           opacity: barOp,
           zIndex: 25,
           pointerEvents: "none",
@@ -824,7 +824,7 @@ const FrameDebug: React.FC<{ frame: number }> = ({ frame }) => (
       zIndex: 30,
     }}
   >
-    F:{String(frame).padStart(3, "0")} | 30FPS | 1920x1080
+    F:{String(frame).padStart(3, "0")} | 30FPS | 1080x1920
   </div>
 );
 
@@ -858,28 +858,28 @@ export const CEOIntroduction: React.FC = () => {
       {/* Layer 3: Tech rings */}
       <TechRings frame={frame} />
 
-      {/* Layer 5: Scanner sweeps */}
+      {/* Layer 4: Scanner sweeps */}
       <ScannerLines frame={frame} />
 
-      {/* Layer 6: Corner brackets */}
+      {/* Layer 5: Corner brackets */}
       <CornerBrackets frame={frame} fps={fps} />
 
-      {/* Layer 7: Floating particles */}
+      {/* Layer 6: Floating particles */}
       <Particles frame={frame} />
 
-      {/* Layer 8: Title */}
+      {/* Layer 7: Title */}
       <TitleBlock frame={frame} fps={fps} />
 
-      {/* Layer 9: HUD Panel (frame 40+) */}
+      {/* Layer 8: HUD Panel (frame 40+) */}
       {frame >= 38 && <HUDPanel frame={frame} fps={fps} />}
 
-      {/* Layer 10: Cinematic bars */}
+      {/* Layer 9: Cinematic bars */}
       <CinematicBars frame={frame} />
 
-      {/* Layer 11: Accent lines */}
+      {/* Layer 10: Accent lines */}
       <AccentLines frame={frame} />
 
-      {/* Layer 12: Frame counter */}
+      {/* Layer 11: Frame counter */}
       <FrameDebug frame={frame} />
     </div>
   );
